@@ -21,7 +21,7 @@ Pres<-read.csv('./Pres1.csv')
 Pres$region<-paste(Pres$county,Pres$precinct,sep='')
 
 
-ky <- readOGR(dsn = '.', layer = 'ky_voting_precinct_geographic_outlines_and_data')
+ky <- readOGR(dsn = '.', layer = 'KY Precincts Merged Final')
 
 gpclibPermit()
 

@@ -1,3 +1,5 @@
+.libPaths('C:/R-Lib')
+
 library('rgdal')
 library('gpclib')
 library('maptools')
@@ -7,13 +9,11 @@ library('mapproj')
 library('choroplethrMaps')
 library('gridExtra')
 library('readr')
-library('dplyr')
 library('R6')
 library('choroplethr')
 library('rjson')
-options(stringsAsFactors = F)
 
-ky <- readOGR(dsn = '.', layer = 'ky_voting_precinct_geographic_outlines_and_data')
+ky <- readOGR(dsn = '.', layer = 'KY Precincts Merged Final')
 
 gpclibPermit()
 
@@ -21,24 +21,15 @@ ky@data$id <- rownames(ky@data)
 ky.points <- fortify(ky, region='id')
 ky.df <- inner_join(ky.points, ky@data, by='id')
 ky.df <- subset(ky.df, long<181)
-jeffco<-subset(ky.df, state_coun==21111)
+jeffco<-subset(ky.df, COUNTY==21111)
 ggplot(jeffco) + aes(long,lat, group=group) + geom_polygon()
 
-ggplot(ky.df) + aes(long, lat, group=group) + geom_polygon()
-
-fulton<-subset(ky.df, state_coun==21075)
-ggplot(fulton) + aes(long, lat, group=group)+ geom_polygon()
 
 primary<-fromJSON(file='./PrimaryElection16.json')
 Contests<-primary$Contest
 Metro8<-Contests[[21]]
 Metro8<-data.frame(matrix(unlist(Metro8$V), nrow=length(Metro8$V), byrow=T),  precinct=Metro8$P)
 colnames(Metro8)<-c('Kolb','Wooden','Long','Meyer','Reily','Coan','White','region')
-
-Metro8$winner<-vector(length=length(Metro8$region))
-for(i in 1:length(Metro8$winner)){
-  Metro8$winner[i]<-colnames(Metro8[1:7])[which(max(Metro8[1:7][i,])==Metro8[1:7][i,])]
-}
 
 Metro8Percent<-Metro8
 for(i in 1:length(Metro8Percent$region)){
@@ -51,8 +42,15 @@ for(i in 1:length(Metro8Percent$region)){
   Metro8Percent$White[i]<-Metro8$White[i]/rowSums(Metro8[1:7])[i]
 }
 
-Eight.df<-subset(jeffco, vtdid %in% Metro8Percent$region)
-Eight.df$region<-Eight.df$vtdid
+Metro8$Winner<-vector(length=length(Metro8$region))
+for(i in 1:length(Metro8$Winner)){
+  Metro8$Winner[i]<-colnames(Metro8[1:7])[which(max(Metro8[i,1:7])==Metro8[i,1:7])]
+}
+Metro8$Winner<-as.factor(Metro8$Winner)
+
+
+Eight.df<-subset(jeffco, VTDID %in% Metro8Percent$region)
+Eight.df$region<-Eight.df$VTDID
 
 Metro8Choropleth <- R6Class("Metro8Choropleth", inherit = choroplethr::Choropleth, public = list(
   initialize=function(user.df){
@@ -122,3 +120,11 @@ grid.arrange(coanChoro$render_with_reference_map(),reilyChoro$render_with_refere
              longChoro$render_with_reference_map(), WhiteChoro$render_with_reference_map(),
              woodenChoro$render_with_reference_map(),
              ncol=2 )
+
+winner<-subset(Metro8, select = c('region','Winner'))
+colnames(winner) <- c('region','value')
+winner <- Metro8Choropleth$new(winner)
+winner$title <- 'Winners By Precinct'
+winner$set_num_colors(7)
+winner$legend <- 'Winner'
+winner$render_with_reference_map()+scale_fill_brewer(palette = "Set1")
